@@ -3,7 +3,7 @@
 use std::net::IpAddr;
 
 use netlink_packet_l2tp::{
-    L2tpAttribute, L2tpCmd, L2tpEncapType, L2tpMessage, L2tpPwType,
+    L2tpAttribute, L2tpCmd, L2tpEncapType, L2tpIfName, L2tpMessage, L2tpPwType,
 };
 
 use crate::{ErrorKind, L2tpError};
@@ -308,7 +308,10 @@ impl L2tpSession {
             attributes.push(L2tpAttribute::PeerCookie(peer_cookie.clone()));
         }
         if let Some(ifname) = self.ifname.as_ref() {
-            attributes.push(L2tpAttribute::IfName(ifname.clone()));
+            let ifname = L2tpIfName::new(ifname).map_err(|e| {
+                invalid_input(&format!("invalid interface name: {e}"))
+            })?;
+            attributes.push(L2tpAttribute::IfName(ifname));
         }
 
         Ok(L2tpMessage {
@@ -362,8 +365,9 @@ impl From<L2tpMessage> for L2tpSession {
                 L2tpAttribute::IfName(v) => {
                     // The kernel reports an empty name for a session which
                     // has no network interface, hide it.
-                    if !v.is_empty() {
-                        ret.ifname = Some(v);
+                    let name = v.to_string_lossy().into_owned();
+                    if !name.is_empty() {
+                        ret.ifname = Some(name);
                     }
                 }
                 L2tpAttribute::Cookie(v) if !v.is_empty() => {
@@ -533,7 +537,9 @@ mod tests {
                     L2tpAttribute::PwType(L2tpPwType::Eth),
                     L2tpAttribute::L2SpecType(1),
                     L2tpAttribute::L2SpecLen(4),
-                    L2tpAttribute::IfName("l2tpeth0".to_string()),
+                    L2tpAttribute::IfName(
+                        L2tpIfName::from_str_ref("l2tpeth0").unwrap()
+                    ),
                 ],
             }
         );
@@ -597,7 +603,9 @@ mod tests {
                 L2tpAttribute::PeerConnId(2000),
                 L2tpAttribute::SessionId(5),
                 L2tpAttribute::PeerSessionId(6),
-                L2tpAttribute::IfName("l2tpeth0".to_string()),
+                L2tpAttribute::IfName(
+                    L2tpIfName::from_str_ref("l2tpeth0").unwrap(),
+                ),
                 L2tpAttribute::RecvSeq(0),
                 L2tpAttribute::SendSeq(1),
             ],

@@ -3,10 +3,10 @@
 use std::{io, sync::Arc};
 
 use futures_util::{Stream, StreamExt, future::ready};
-use genetlink::GenetlinkHandle;
+use genetlink::{GenetlinkError, GenetlinkHandle};
 use netlink_packet_core::{
-    DecodeError, ErrorMessage, NLM_F_ACK, NLM_F_DUMP, NLM_F_REQUEST,
-    NetlinkMessage, NetlinkPayload,
+    ErrorMessage, NLM_F_ACK, NLM_F_DUMP, NLM_F_REQUEST, NetlinkMessage,
+    NetlinkPayload,
 };
 use netlink_packet_generic::GenlMessage;
 use netlink_packet_l2tp::{L2tpCmd, L2tpMessage};
@@ -135,7 +135,7 @@ impl L2tpHandle {
 fn parse_nl_msg_stream(
     nl_msg: NetlinkMessage<GenlMessage<L2tpMessage>>,
     stream: impl Stream<
-        Item = Result<NetlinkMessage<GenlMessage<L2tpMessage>>, DecodeError>,
+        Item = Result<NetlinkMessage<GenlMessage<L2tpMessage>>, GenetlinkError>,
     >,
 ) -> impl Stream<Item = Result<L2tpMessage, L2tpError>> {
     let nl_msg = Arc::new(nl_msg);
@@ -272,7 +272,7 @@ mod tests {
     async fn parse_replies(
         replies: Vec<NetlinkMsg>,
     ) -> Vec<Result<L2tpMessage, L2tpError>> {
-        let replies: Vec<Result<NetlinkMsg, DecodeError>> =
+        let replies: Vec<Result<NetlinkMsg, GenetlinkError>> =
             replies.into_iter().map(Ok).collect();
         parse_nl_msg_stream(inner_message(), stream::iter(replies))
             .collect()
